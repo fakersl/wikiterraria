@@ -93,6 +93,32 @@ app.get("/npcs/:id/relacionamentos", (req, res) => {
   res.json(relacionamentos);
 });
 
+//Rota pra atualizar NPC
+app.put("/npcs/:id", (req, res) => {
+  const { id } = req.params;
+  const { nome, bioma, imagem, ama, gosta, nao_gosta, odeia } = req.body;
+
+  const stmt = db.prepare(
+    "UPDATE npcs SET nome = ?, bioma = ?, imagem = ?, ama = ?, gosta = ?, nao_gosta = ?, odeia = ? WHERE id = ?"
+  );
+  stmt.run(nome, bioma, imagem, ama, gosta, nao_gosta, odeia, id);
+
+  res.json({ id, nome, bioma, imagem, ama, gosta, nao_gosta, odeia });
+});
+
+//Rota pra excluir NPC
+app.delete("/npcs/:id", (req, res) => {
+  const { id } = req.params;
+  const stmt = db.prepare("DELETE FROM npcs WHERE id = ?");
+  const info = stmt.run(id);
+
+  if (info.changes === 0) {
+    return res.status(404).json({ error: "NPC não encontrado" });
+  }
+
+  res.json({ message: "NPC deletado com sucesso!" });
+});
+
 // Inicia o servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
