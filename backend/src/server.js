@@ -119,6 +119,14 @@ app.delete("/npcs/:id", (req, res) => {
   res.json({ message: "NPC deletado com sucesso!" });
 });
 
+// Rota para servir o frontend (HTML do Dashboard)
+app.use(express.static(path.join(__dirname, "frontend/build")));
+
+// Exemplo de rota para servir o dashboard
+app.get("/dashboard", (req, res) => {
+  res.sendFile(path.join(__dirname, "frontend/dashboard.html")); // Serve a página de cadastro
+});
+
 // Inicia o servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
