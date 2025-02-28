@@ -1,24 +1,32 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import NPCList from '../../components/npcList';
+import NPCForm from '../../components/npcForm';
 
 export default function Home() {
-  const [items, setItems] = useState([]);
+  const [npcs, setNpcs] = useState([]);
+  const [editingNpc, setEditingNpc] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/items")
-      .then((response) => response.json())
-      .then((data) => setItems(data));
-  }, []);
+    const fetchNpcs = async () => {
+      const res = await fetch('http://localhost:5000/api/items');
+      const data = await res.json();
+      setNpcs(data);
+    };
+
+    fetchNpcs();
+  }, [npcs]);
+
+  const handleEditNpc = (npc) => {
+    setEditingNpc(npc);
+  };
 
   return (
     <div>
-      <h1>Items</h1>
-      <ul>
-        {items.map((item) => (
-          <li key={item.id}>{item.name}</li>
-        ))}
-      </ul>
+      <h1>Painel de Administração de NPCs</h1>
+      <NPCForm npc={editingNpc} />
+      <NPCList npcs={npcs} onEditNpc={handleEditNpc} />
     </div>
   );
 }
