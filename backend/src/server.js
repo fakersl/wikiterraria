@@ -1,85 +1,100 @@
-// src/server.js
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const pool = require('./db'); // Conexão com o banco de dados
+const express = require("express");
+const db = require("./db");
 
 const app = express();
-const port = 5000;
 app.use(express.json());
 
-// Configurar multer para armazenar imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../public/images'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
+// Rota para adicionar um NPC
+app.post("/npcs", (req, res) => {
+  const { nome, bioma, imagem, ama, gosta, nao_gosta, odeia } = req.body;
+
+  // Certifique-se de que a instância do db está funcionando
+  console.log(db); // Verifique se a instância é válida
+
+  // Preparando e rodando a consulta de inserção
+  const stmt = db.prepare(
+    "INSERT INTO npcs (nome, bioma, imagem, ama, gosta, nao_gosta, odeia) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  );
+  const info = stmt.run(nome, bioma, imagem, ama, gosta, nao_gosta, odeia);
+
+  res.json({
+    id: info.lastInsertRowid,
+    nome,
+    bioma,
+    imagem,
+    ama,
+    gosta,
+    nao_gosta,
+    odeia,
+  });
 });
 
-const upload = multer({ storage: storage });
+// Rota para buscar todos os NPCs
+app.get("/npcs", (req, res) => {
+  const stmt = db.prepare("SELECT * FROM npcs");
+  const npcs = stmt.all(); // Recupera todos os NPCs
+  res.json(npcs);
+});
 
-// Adicionar NPC
-app.post('/api/items', upload.single('imagem'), async (req, res) => {
-  const { nome, bioma, ama, gosta, odeia } = req.body;
-  const imagem = `/images/${req.file.filename}`;
+// Rota para adicionar um relacionamento entre NPCs
+app.post("/npcs/:id/relacionamentos", (req, res) => {
+  const npc_id = req.params.id; // Pega o ID do NPC da URL
+  const { relacionado_id, tipo_relacionamento } = req.body;
+
+  // Verifica se os NPCs com os IDs fornecidos existem na tabela npcs
+  const stmtNpc = db.prepare("SELECT * FROM npcs WHERE id = ?");
+  const npc = stmtNpc.get(npc_id);
+
+  const stmtRelacionado = db.prepare("SELECT * FROM npcs WHERE id = ?");
+  const relacionado = stmtRelacionado.get(relacionado_id);
+
+  // Se algum dos NPCs não existir, retorna um erro
+  if (!npc) {
+    return res
+      .status(400)
+      .json({ error: `NPC com id ${npc_id} não encontrado.` });
+  }
+
+  if (!relacionado) {
+    return res
+      .status(400)
+      .json({ error: `NPC com id ${relacionado_id} não encontrado.` });
+  }
+
+  // Certifique-se de que todos os campos necessários estão presentes
+  if (!relacionado_id || !tipo_relacionamento) {
+    return res.status(400).json({ error: "Faltando parâmetros obrigatórios" });
+  }
 
   try {
-    const result = await pool.query(
-      'INSERT INTO npcs (nome, bioma, ama, gosta, odeia, imagem) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [nome, bioma, ama, gosta, odeia, imagem]
+    // Preparando e rodando a consulta de inserção
+    const stmt = db.prepare(
+      "INSERT INTO npc_relacionamentos (npc_id, relacionado_id, tipo_relacionamento) VALUES (?, ?, ?)"
     );
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('ERRO AO CADASTRAR NPC:', error);
-    res.status(500).json({ error: 'Erro ao cadastrar NPC' });
+    const info = stmt.run(npc_id, relacionado_id, tipo_relacionamento);
+
+    res.json({
+      id: info.lastInsertRowid,
+      npc_id,
+      relacionado_id,
+      tipo_relacionamento,
+    });
+  } catch (err) {
+    console.error("Erro ao adicionar relacionamento:", err);
+    res.status(500).json({ error: "Erro ao adicionar relacionamento" });
   }
 });
 
-// Listar NPCs
-app.get('/api/items', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM npcs');
-    res.status(200).json(result.rows);
-  } catch (error) {
-    console.error('ERRO AO BUSCAR NPCS:', error);
-    res.status(500).json({ error: 'Erro ao buscar NPCs' });
-  }
+// Rota para buscar os relacionamentos de um NPC
+app.get("/npcs/:id/relacionamentos", (req, res) => {
+  const { id } = req.params;
+  const stmt = db.prepare(`SELECT * FROM npc_relacionamentos WHERE npc_id = ?`);
+  const relacionamentos = stmt.all(id);
+  res.json(relacionamentos);
 });
 
-// Editar NPC
-app.put('/api/items/:id', upload.single('imagem'), async (req, res) => {
-  const { nome, bioma, ama, gosta, odeia } = req.body;
-  const imagem = req.file ? `/images/${req.file.filename}` : null;
-  const npcId = req.params.id;
-
-  try {
-    const result = await pool.query(
-      'UPDATE npcs SET nome = $1, bioma = $2, ama = $3, gosta = $4, odeia = $5, imagem = $6 WHERE id = $7 RETURNING *',
-      [nome, bioma, ama, gosta, odeia, imagem, npcId]
-    );
-    res.status(200).json(result.rows[0]);
-  } catch (error) {
-    console.error('ERRO AO EDITAR NPC:', error);
-    res.status(500).json({ error: 'Erro ao editar NPC' });
-  }
-});
-
-// Deletar NPC
-app.delete('/api/items/:id', async (req, res) => {
-  const npcId = req.params.id;
-
-  try {
-    await pool.query('DELETE FROM npcs WHERE id = $1', [npcId]);
-    res.status(204).send();
-  } catch (error) {
-    console.error('ERRO AO DELETAR NPC:', error);
-    res.status(500).json({ error: 'Erro ao deletar NPC' });
-  }
-});
-
-// Iniciar servidor
-app.listen(port, () => {
-  console.log(`Servidor rodando em http://localhost:${port}`);
+// Inicia o servidor
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });

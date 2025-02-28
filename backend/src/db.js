@@ -1,26 +1,33 @@
-const { Pool } = require("pg");
+const Database = require("better-sqlite3");
+// Crie e exporte a instância do banco de dados
+const db = new Database("./wikiterraria.db", { verbose: console.log });
+module.exports = db;
 
-// Configuração da conexão com o PostgreSQL
-const pool = new Pool({
-  user: "postgres", // Substitua pelo seu usuário
-  host: "localhost", // O host pode ser localhost se estiver rodando localmente
-  database: "terrariawiki", // Nome do banco de dados
-  password: "root", // Substitua pela sua senha do banco
-  port: 5432, // Porta padrão do PostgreSQL
-});
+// Criação das tabelas caso não existam
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS npcs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    bioma TEXT,
+    imagem BLOB,
+    ama TEXT,
+    gosta TEXT,
+    nao_gosta TEXT,
+    odeia TEXT
+  )
+`).run();
 
-// Função para realizar a consulta
-const query = (text, params) => pool.query(text, params);
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS npc_relacionamentos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    npc_id INTEGER NOT NULL,
+    relacionado_id INTEGER NOT NULL,
+    tipo_relacionamento TEXT,
+    FOREIGN KEY (npc_id) REFERENCES npcs(id) ON DELETE CASCADE,
+    FOREIGN KEY (relacionado_id) REFERENCES npcs(id) ON DELETE CASCADE
+  )
+`).run();
 
-// Exportando a função query para ser utilizada no server.js
-module.exports = {
-  query,
-};
-
-// Verificar a conexão
-pool
-  .connect()
-  .then(() => console.log("Conexão com o banco de dados bem-sucedida!"))
-  .catch((err) => console.error("Erro ao conectar ao banco de dados", err));
-
-module.exports = pool;
+/* const stmt = db.prepare("SELECT * FROM npcs");
+const rows = stmt.all(); // Pega todas as linhas
+console.log(rows); */
